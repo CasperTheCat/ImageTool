@@ -51,14 +51,21 @@ namespace CTCBMP
 {
 	class Bitmap {
 	public:
-		unsigned char* openBMP(const char* filename);
+		bool isInitialized;
+		void openBMP(const char* filename);
 		Bitmap();
 		Bitmap(const char* filename);
+		unsigned char* getArray();
 		~Bitmap();
 
 
 	private:
-		//Do Things
+		RGBQ* pixelData;
+		BMPFileHeader fileHeader;
+		BMPFileHeader bmpFileHead;
+		BMPInfoHeader infoHeader;
+		unsigned char *mArray;
+
 	};
 }
 #endif
