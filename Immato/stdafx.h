@@ -7,7 +7,7 @@
 
 #include "targetver.h"
 
-#include "FreeImage.h"
+#include "..\lib\FreeImage.h"
 #include <stdio.h>
 #include <tchar.h>
 #include <iostream>
