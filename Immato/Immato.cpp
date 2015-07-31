@@ -73,10 +73,6 @@ int main(int argc, char** argv)
 	{
 		file_name_str = argv[1];
 	}
-	cout << CharToFloat(189) << endl;
-	cout << int(FloatToChar(0.5f)) << endl;
-
-	getchar();
 
 	// TODO: DETECT MISSING FILES!
 
