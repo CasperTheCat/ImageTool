@@ -1,4 +1,5 @@
 # Created by https://www.gitignore.io
+# Made for Visual Studio, CUDA and C++
 
 ### VisualStudio ###
 ## Ignore Visual Studio temporary files, build results, and
@@ -199,6 +200,15 @@ FakesAssemblies/
 *.opt
 
 
+### CUDA ###
+*.i
+*.ii
+*.gpu
+*.ptx
+*.cubin
+*.fatbin
+
+
 ### C++ ###
 # Compiled Object files
 *.slo
@@ -228,3 +238,5 @@ FakesAssemblies/
 *.exe
 *.out
 *.app
+
+
