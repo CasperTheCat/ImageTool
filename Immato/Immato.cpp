@@ -1,4 +1,5 @@
 // Immato.cpp : Defines the entry point for the console application.
+//https://software.intel.com/en-us/articles/setting-up-the-build-environment-for-using-intel-c-or-fortran-compilers
 //
 
 #include "stdafx.h"
@@ -6,57 +7,81 @@
 
 using namespace std;
 
-float CharToFloat(unsigned char in)
+inline float CharToFloat(unsigned char in)
 {
 	return (float(in) / float(255));
 }
 
-unsigned char FloatToChar(float in)
+inline unsigned char FloatToChar(float in)
 {
-	return unsigned char(Immato_Clamp(in)*255);
+	return unsigned char(Immato_Clamp(in) * 255);
 }
 
-FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH , int pitch, unsigned BPP, unsigned rMask, unsigned gMask, unsigned bMask)
+FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch, unsigned BPP, unsigned rMask, unsigned gMask, unsigned bMask)
 {
 	//Get Raw Data
 	unsigned char* imageData = FreeImage_GetBits(image);
 
 	// MEMORY WHORING make a bVec3
-	bVec3* bmpData = new bVec3[pH*pW]; // Size is pW*pH*4
+	float4* bmpData = new float4[pH*pW]; // Size is pW*pH*4
 
 	uint64_t bytsInImg = pW * pH * 4;
 
-
-	for (uint64_t iP = 0; iP < bytsInImg; iP += 4)
+	// Convert to float4
+#pragma omp parallel for
+	for (long iP = 0; iP < bytsInImg; iP += 4)
 	{
-		bmpData[iP / 4].R = imageData[iP];
-		bmpData[iP / 4].G = imageData[iP + 1];
-		bmpData[iP / 4].B = imageData[iP + 2];
-		bmpData[iP / 4].A = imageData[iP + 3];
+		bmpData[iP / 4].R = CharToFloat(imageData[iP]);
+		bmpData[iP / 4].G = CharToFloat(imageData[iP + 1]);
+		bmpData[iP / 4].B = CharToFloat(imageData[iP + 2]);
+		bmpData[iP / 4].A = CharToFloat(imageData[iP + 3]);
 	}
+	cout << "Image Decoded" << endl;
+	// Image manip loop
+#pragma omp parallel for
+	for (long iC = 0; iC < bytsInImg / 4; iC++)
+	{
+		bmpData[iC] -= 0.5f;
+		bmpData[iC] *= 1.2f;
+		bmpData[iC] += 0.5f;
+	}
+	cout << "Image Processed" << endl;
+
 
 	unsigned char* iDat = new unsigned char[bytsInImg];
 
-	for (uint64_t iP = 0; iP < bytsInImg; iP += 4)
+#pragma omp parallel for
+	for (long iP = 0; iP < bytsInImg; iP += 4)
 	{
-		iDat[iP] = bmpData[iP / 4].R;
-		iDat[iP + 1] = bmpData[iP / 4].G;
-		iDat[iP + 2] = bmpData[iP / 4].B;
-		iDat[iP + 3] = bmpData[iP / 4].A;
+	iDat[iP] = FloatToChar(bmpData[iP / 4].R);
+	iDat[iP + 1] = FloatToChar(bmpData[iP / 4].G);
+	iDat[iP + 2] = FloatToChar(bmpData[iP / 4].B);
+	iDat[iP + 3] = FloatToChar(bmpData[iP / 4].A);
 	}
 
-#pragma omp parallel for
-	for (long iC = 0; iC < bytsInImg; iC++)
+/* This moves left 50% to right side
+#pragma omp parallel for 
+	for (long iP = 0; iP < bytsInImg; iP += 4)
 	{
-		float _nDat = CharToFloat(iDat[iC]);
-		_nDat -= 0.5f;
-		_nDat *= 1.2f;
-		_nDat += 0.5f;
-		iDat[iC] = FloatToChar(_nDat);
-	}
+		if (iP < bytsInImg  - 4)
+		{
+			iDat[iP] = FloatToChar(bmpData[((iP / 4) + pW / 2) % (bytsInImg / 4)].R);
+			iDat[iP + 1] = FloatToChar(bmpData[((iP / 4) + pW / 2) % (bytsInImg / 4)].G);
+			iDat[iP + 2] = FloatToChar(bmpData[((iP / 4) + pW / 2) % (bytsInImg / 4)].B);
+			iDat[iP + 3] = FloatToChar(bmpData[((iP / 4) + pW / 2) % (bytsInImg / 4)].A);
+		}
+	}*/
+
+	cout << "Image Encoded" << endl;
+
+	delete[] bmpData;
+
+	FIBITMAP* returnVal = FreeImage_ConvertFromRawBits(iDat, pW, pH, pitch, BPP, rMask, gMask, bMask);
+
+	delete[] iDat;
 
 	// We has data!
-	return FreeImage_ConvertFromRawBits(iDat, pW, pH, pitch, BPP, rMask, gMask, bMask);
+	return returnVal;
 
 	//return _outImage;
 }
@@ -107,7 +132,7 @@ int main(int argc, char** argv)
 	// DO SOME HLSL!
 	FIBITMAP* rekt_fibitmap = Immato_RunCustom(_bitMap, iWidth, iHeight, pitch, BPP, rMask, gMask, bMask);
 
-	FreeImage_Save(FIF_BMP,rekt_fibitmap , "TEST.bmp");
+	FreeImage_Save(FIF_BMP, rekt_fibitmap, "TEST.bmp");
 
 	//delete(_outName);
 	//delete[] file_name_str;

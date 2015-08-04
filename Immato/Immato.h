@@ -2,16 +2,43 @@
 
 
 // Float3, HLSL - can handle anything!
-struct float3
+struct float4
 {
 	float R;
 	float G;
 	float B;
 	float A;
+
+#pragma region Overload Opers
+	void operator += (float n_x)
+	{
+		R = R + n_x;
+		G = G + n_x;
+		B = B + n_x;
+	}
+	void operator *= (float n_x)
+	{
+		R = R * n_x;
+		G = G * n_x;
+		B = B * n_x;
+	}
+	void operator -= (float n_x)
+	{
+		R = R - n_x;
+		G = G - n_x;
+		B = B - n_x;
+	}
+	void operator /= (float n_x)
+	{
+		R = R / n_x;
+		G = G / n_x;
+		B = B / n_x;
+	}
+#pragma endregion
 };
 
-// Define my V3, can handle 32BPP
-struct bVec3 
+// Define my V3, can handle 40BPP
+struct bVec4
 {
 	unsigned char R;
 	unsigned char G;
