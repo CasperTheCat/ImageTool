@@ -103,7 +103,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 
 	// Calc out the dif - BLURSHARP
 	float* difArr = new float[pH*pW];
-	int dWd = 8;
+	int dWd = 6;
 #pragma omp parallel for
 	for (long iC = 0; iC < bytsInImg / 4; iC++)
 	{/*
@@ -233,7 +233,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 	cout << "Chroma Smooth Complete" << endl;
 
 
-	uint64_t kliTriggers = 0;
+	/*uint64_t kliTriggers = 0;
 	float* kliArray = new float[pH * pW];
 #pragma omp parallel for
 	for (long iX = 0; iX < bytsInImg / 4; iX++)
@@ -242,7 +242,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 	}
 
 	cout << "Pixel Alignment Count " << kliTriggers << " pixels in 3 channels" << endl;
-
+	*/
 
 	float edgeThreshold = 0.01f;
 #pragma omp parallel for
@@ -256,14 +256,13 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		//float sharpMask = lArray[iC] - kliArray[iC];
 
 		//sharpMask = round(Immato_Clamp((((sharpMask - edgeThreshold) * 10.f) + edgeThreshold)));
-		sharpMask = (round(sharpMask * 64.f)) / 64.f;
-
-		bmpData[iC] = (cArray[iC] + lArray[iC]) * kliArray[iC];
+		//sharpMask = (round(sharpMask * 16.f)) / 16.f;
+		//bmpData[iC] = cArray[iC] + lArray[iC] + (dot(sharpMask, LUMA * 2)) - dot(cArray[iC], float3(kliArray[iC], kliArray[iC], kliArray[iC]));
 		//bmpData[iC] = (cArray[iC] + lArray[iC]) * kliArray[iC];
 		/*bmpData[iC].R = kliArray[iC];
 		bmpData[iC].G = lArray[iC];
 		bmpData[iC].B = difArr[iC];*/
-		//bmpData[iC] = (cArray[iC]) + lArray[iC] + (dot(sharpMask, LUMA * 2));
+		bmpData[iC] = (cArray[iC]) + lArray[iC] + (dot(sharpMask, LUMA * 2));
 
 		/*bmpData[iC].R =3 * (dot(sharpMask, LUMA));
 		bmpData[iC].G =3 * (dot(sharpMask, LUMA));
