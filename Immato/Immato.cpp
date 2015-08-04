@@ -103,6 +103,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 
 	// Calc out the dif - BLURSHARP
 	float* difArr = new float[pH*pW];
+	int dWd = 8;
 #pragma omp parallel for
 	for (long iC = 0; iC < bytsInImg / 4; iC++)
 	{/*
@@ -121,16 +122,16 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		  00,00,00,00,00]
 		  */
 		  // Immediate Weights
-		float difUp = lArray[Modulus((iC - pW), (bytsInImg / 4))];
-		float difDown = lArray[Modulus((iC + pW), (bytsInImg / 4))];
-		float difLeft = lArray[Modulus((iC - 1), (bytsInImg / 4))];
-		float difRight = lArray[Modulus((iC + 1), (bytsInImg / 4))];
+		float difUp = lArray[Modulus((iC - pW * dWd), (bytsInImg / 4))];
+		float difDown = lArray[Modulus((iC + pW * dWd), (bytsInImg / 4))];
+		float difLeft = lArray[Modulus((iC - 1 * dWd), (bytsInImg / 4))];
+		float difRight = lArray[Modulus((iC + 1 * dWd), (bytsInImg / 4))];
 
 		// Non Immed
-		float difUpRight = lArray[Modulus(((iC - pW) + 1), (bytsInImg / 4))];
-		float difDownLeft = lArray[Modulus(((iC + pW) - 1), (bytsInImg / 4))];
-		float difUpLeft = lArray[Modulus(((iC - pW) - 1), (bytsInImg / 4))];
-		float difDownRight = lArray[Modulus(((iC + pW) + 1), (bytsInImg / 4))];
+		float difUpRight = lArray[Modulus(((iC - pW * dWd) + 1 * dWd), (bytsInImg / 4))];
+		float difDownLeft = lArray[Modulus(((iC + pW * dWd) - 1 * dWd), (bytsInImg / 4))];
+		float difUpLeft = lArray[Modulus(((iC - pW * dWd) - 1 * dWd), (bytsInImg / 4))];
+		float difDownRight = lArray[Modulus(((iC + pW * dWd) + 1 * dWd), (bytsInImg / 4))];
 
 		difArr[iC] = lArray[iC] * 0.12f
 			+ difUp * 0.14f
@@ -146,7 +147,9 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 	cout << "Luminosity Sharp Mask Complete" << endl;
 
 
-// REDUCE THE CHROMA DISTORT!
+	// REDUCE THE CHROMA DISTORT!
+	int sWd = 1;
+
 #pragma omp parallel for
 	for (long iC = 0; iC < bytsInImg / 4; iC++)
 	{
@@ -158,7 +161,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		  2,  8, 12,  8,
 		   ,   ,  3,  2,  ]
 		*/
-		// LATERAL
+		/*// LATERAL
 		float3 dif3Up = cArray[Modulus((iC - pW), (bytsInImg / 4))];
 		float3 dif3Down = cArray[Modulus((iC + pW), (bytsInImg / 4))];
 		float3 dif3Left = cArray[Modulus((iC - 1), (bytsInImg / 4))];
@@ -180,7 +183,31 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		float3 dif3UpUpLeft = cArray[Modulus((iC - 2 * pW) - 1, (bytsInImg / 4))];
 		float3 dif3DownDownRight = cArray[Modulus((iC + 2 * pW) + 1, (bytsInImg / 4))];
 		float3 dif3LeftLeftDown = cArray[Modulus((iC - 2) + pW, (bytsInImg / 4))];
-		float3 dif3RightRightUp = cArray[Modulus((iC + 2) - pW, (bytsInImg / 4))];
+		float3 dif3RightRightUp = cArray[Modulus((iC + 2) - pW, (bytsInImg / 4))];*/
+
+		// LATERAL
+		float3 dif3Up = cArray[Modulus((iC - pW * sWd), (bytsInImg / 4))];
+		float3 dif3Down = cArray[Modulus((iC + pW * sWd), (bytsInImg / 4))];
+		float3 dif3Left = cArray[Modulus((iC - sWd), (bytsInImg / 4))];
+		float3 dif3Right = cArray[Modulus((iC + sWd), (bytsInImg / 4))];
+
+		// DIAGONAL
+		float3 dif3UpRight = cArray[Modulus(((iC - pW * sWd) + sWd), (bytsInImg / 4))];
+		float3 dif3DownLeft = cArray[Modulus(((iC + pW * sWd) - sWd), (bytsInImg / 4))];
+		float3 dif3UpLeft = cArray[Modulus(((iC - pW * sWd) - sWd), (bytsInImg / 4))];
+		float3 dif3DownRight = cArray[Modulus(((iC + pW * sWd) + sWd), (bytsInImg / 4))];
+
+		// LATERAL Out
+		float3 dif3UpUp = cArray[Modulus((iC - 2 * pW * sWd), (bytsInImg / 4))];
+		float3 dif3DownDown = cArray[Modulus((iC + 2 * pW * sWd), (bytsInImg / 4))];
+		float3 dif3LeftLeft = cArray[Modulus((iC - 2 * sWd), (bytsInImg / 4))];
+		float3 dif3RightRight = cArray[Modulus((iC + 2 * sWd), (bytsInImg / 4))];
+
+		// DIAGONAL with outward shift
+		float3 dif3UpUpLeft = cArray[Modulus((iC - 2 * pW * sWd) - 1 * sWd, (bytsInImg / 4))];
+		float3 dif3DownDownRight = cArray[Modulus((iC + 2 * pW * sWd) + 1 * sWd, (bytsInImg / 4))];
+		float3 dif3LeftLeftDown = cArray[Modulus((iC - 2 * sWd) + pW * sWd, (bytsInImg / 4))];
+		float3 dif3RightRightUp = cArray[Modulus((iC + 2 * sWd) - pW * sWd, (bytsInImg / 4))];
 
 		cArray[iC] = dif3Up * 0.12f
 			+ dif3Down * 0.12f
@@ -205,41 +232,17 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 
 	cout << "Chroma Smooth Complete" << endl;
 
+
 	uint64_t kliTriggers = 0;
+	float* kliArray = new float[pH * pW];
 #pragma omp parallel for
 	for (long iX = 0; iX < bytsInImg / 4; iX++)
 	{
-		if (iX == 0)
-		{
-			cout << vMag(cArray[iX]) << ".. VS .." << vMag(cArray[Modulus(iX + 1, bytsInImg / 4)]) * 1.25 << endl;
-		}
-
-		int fMover = 1;
-
-		// Bring PixelAlignment
-		while ((vMag(cArray[iX]) < vMag(cArray[Modulus(iX + fMover,bytsInImg / 4)]) * 1.05 	&& vMag(cArray[iX]) > vMag(cArray[Modulus(iX + fMover, bytsInImg / 4)]) * 0.95)
-			&& fMover < 4)
-		{
-			cArray[Modulus(iX + fMover, bytsInImg / 4)] = (cArray[Modulus(iX + fMover, bytsInImg / 4)] + (cArray[iX] + cArray[Modulus(iX + fMover, bytsInImg / 4)]) / 2) / 2;
-			fMover++;
-			kliTriggers++;
-			
-		}
-		fMover = 1;
-		while ((vMag(cArray[iX]) < vMag(cArray[Modulus(iX - fMover, bytsInImg / 4)]) * 1.05 && vMag(cArray[iX]) > vMag(cArray[Modulus(iX - fMover, bytsInImg / 4)]) * 0.95)
-			&& fMover < 4)
-		{
-			cArray[Modulus(iX - fMover, bytsInImg / 4)] = (cArray[Modulus(iX - fMover, bytsInImg / 4)] + (cArray[iX] + cArray[Modulus(iX - fMover, bytsInImg / 4)]) / 2) / 2;
-			fMover++;
-			kliTriggers++;
-		}
-
-		
+		kliArray[iX] = Immato_Clamp(((vMag(cArray[iX]) - 0.5f) * 1.5f) + 0.5f);
 	}
 
-	cout << "Pixel Alignment adjusted" << kliTriggers << " pixels" << endl;
+	cout << "Pixel Alignment Count " << kliTriggers << " pixels in 3 channels" << endl;
 
-	getchar();
 
 	float edgeThreshold = 0.01f;
 #pragma omp parallel for
@@ -250,11 +253,17 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		//chroma = (((chroma - 0.5f) * 1.2f) + 0.5f);
 
 		float sharpMask = lArray[iC] - difArr[iC];
+		//float sharpMask = lArray[iC] - kliArray[iC];
 
 		//sharpMask = round(Immato_Clamp((((sharpMask - edgeThreshold) * 10.f) + edgeThreshold)));
 		sharpMask = (round(sharpMask * 64.f)) / 64.f;
 
-		bmpData[iC] = cArray[iC] + lArray[iC] + (dot(sharpMask, LUMA));
+		bmpData[iC] = (cArray[iC] + lArray[iC]) * kliArray[iC];
+		//bmpData[iC] = (cArray[iC] + lArray[iC]) * kliArray[iC];
+		/*bmpData[iC].R = kliArray[iC];
+		bmpData[iC].G = lArray[iC];
+		bmpData[iC].B = difArr[iC];*/
+		//bmpData[iC] = (cArray[iC]) + lArray[iC] + (dot(sharpMask, LUMA * 2));
 
 		/*bmpData[iC].R =3 * (dot(sharpMask, LUMA));
 		bmpData[iC].G =3 * (dot(sharpMask, LUMA));
