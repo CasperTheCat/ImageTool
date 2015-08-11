@@ -148,8 +148,8 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 
 
 	// REDUCE THE CHROMA DISTORT!
-	int sWd = 1;
-
+	int sWd = 32;
+	float3 *dirChArray = new float3[pH * pW];
 #pragma omp parallel for
 	for (long iC = 0; iC < bytsInImg / 4; iC++)
 	{
@@ -209,7 +209,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		float3 dif3LeftLeftDown = cArray[Modulus((iC - 2 * sWd) + pW * sWd, (bytsInImg / 4))];
 		float3 dif3RightRightUp = cArray[Modulus((iC + 2 * sWd) - pW * sWd, (bytsInImg / 4))];
 
-		cArray[iC] = dif3Up * 0.12f
+		dirChArray[iC] = dif3Up * 0.12f
 			+ dif3Down * 0.12f
 			+ dif3Left * 0.12f
 			+ dif3Right * 0.12f // mid
@@ -253,6 +253,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		//chroma = (((chroma - 0.5f) * 1.2f) + 0.5f);
 
 		float sharpMask = lArray[iC] - difArr[iC];
+		float3 sharpChroma = cArray[iC] - dirChArray[iC];
 		//float sharpMask = lArray[iC] - kliArray[iC];
 
 		//sharpMask = round(Immato_Clamp((((sharpMask - edgeThreshold) * 10.f) + edgeThreshold)));
@@ -262,7 +263,10 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 		/*bmpData[iC].R = kliArray[iC];
 		bmpData[iC].G = lArray[iC];
 		bmpData[iC].B = difArr[iC];*/
-		bmpData[iC] = (cArray[iC]) + lArray[iC] + (dot(sharpMask, LUMA * 2));
+		//bmpData[iC] = (cArray[iC]) + lArray[iC] + (dot(sharpMask, LUMA * 2));
+		bmpData[iC] = (cArray[iC] - dot(sharpMask, sharpChroma * 4)) // Use sharpmask to define edges
+			+ lArray[iC] + (dot(sharpMask, LUMA / 2));
+		//bmpData[iC] = (((bmpData[iC] - 0.5f) * 1.2f) + 0.5f);
 
 		/*bmpData[iC].R =3 * (dot(sharpMask, LUMA));
 		bmpData[iC].G =3 * (dot(sharpMask, LUMA));
@@ -315,6 +319,7 @@ FIBITMAP* Immato_RunCustom(FIBITMAP* image, uint32_t pW, uint32_t pH, int pitch,
 	delete[] cArray;
 	delete[] difArr;
 	delete[] bmpData;
+	delete[] dirChArray;
 
 	FIBITMAP* returnVal = FreeImage_ConvertFromRawBits(iDat, pW, pH, pitch, BPP, rMask, gMask, bMask);
 
