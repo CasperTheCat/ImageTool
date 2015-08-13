@@ -225,9 +225,9 @@ bool _GPUSelected =false;
 void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY, int fGPU)
 {
 	// Get Device. ATM this check if to prevent Driver RST
-	int deviceCount;
-	cudaGetDeviceCount(&deviceCount);
-	if (fGPU <= deviceCount)
+	//int deviceCount;
+	//cudaGetDeviceCount(&deviceCount);
+	/*if (fGPU <= deviceCount)
 	{
 		cudaSetDevice(fGPU);
 		std::cout << "Thread is utilizing GPU " << fGPU << std::endl;
@@ -236,7 +236,8 @@ void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY, in
 	{
 		std::cout << "Threading Failure!!!" << std::endl;
 		return; 
-	}
+	}*/
+        cudaSetDevice(fGPU);
 	/*if (!_GPUSelected)
 	{
 		if (deviceCount == 0)
@@ -311,8 +312,11 @@ void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY, in
 }
 
 
-void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t pY, int GPU)
+void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t pY, int iGPU)
 {
+        // Make sure the memory is allocated on the correct GPU 
+        cudaSetDevice(iGPU);
+
 	// MEMCPY to GPU
 	unsigned char* deviceData;
 	cudaMalloc((void**)&deviceData, sizeof(unsigned char) * dataLength);
@@ -321,7 +325,7 @@ void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t 
 	cudaMemcpy(deviceData, data, dataLength, cudaMemcpyHostToDevice);
 
 
-	gpuSelector(deviceData, dataLength, pX, pY, GPU);
+	gpuSelector(deviceData, dataLength, pX, pY, iGPU);
 
 
 
