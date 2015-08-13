@@ -116,7 +116,7 @@ int main(int argc, char** argv)
 
 		// Loop until all done. We are off by one...
 		// I don't even
-		while (jobsRemaining > 1)
+		while (jobsRemaining > 0)
 		{
 			// For every active thread
 			// Check if joinable, if they are then
@@ -127,7 +127,7 @@ int main(int argc, char** argv)
 				{
 					tPool[cT]->join();
 					--jobsRemaining;
-					if (jobsRemaining > 1)
+					if (jobsAllocated < argc - 1)
 					{
 						jobsAllocated++; // SEMAPHORE?
 						cout << jobsRemaining << endl;
