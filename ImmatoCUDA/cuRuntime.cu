@@ -200,7 +200,7 @@ __global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t 
 	//pChro = pChro * 1.5f;
 
 	cOut[gIdx] = pChro;
-	lOut[gIdx] = pLuma + dot(sharp, LUMA);
+	lOut[gIdx] = pLuma + dot(sharp, LUMA * 2);
 
 	/*__syncthreads();
 	in[gIdx] = pChro + pLuma + dot(sharp, LUMA * 2);*/
@@ -222,12 +222,22 @@ __global__ void kProcessStepTwo(float3* out, float3* cIn, float* lIn, uint64_t l
 
 
 bool _GPUSelected =false;
-void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY)
+void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY, int fGPU)
 {
-	// Get Device
+	// Get Device. ATM this check if to prevent Driver RST
 	int deviceCount;
 	cudaGetDeviceCount(&deviceCount);
-	if (!_GPUSelected)
+	if (fGPU <= deviceCount)
+	{
+		cudaSetDevice(fGPU);
+		std::cout << "Thread is utilizing GPU " << fGPU << std::endl;
+	}
+	else
+	{
+		std::cout << "Threading Failure!!!" << std::endl;
+		return; 
+	}
+	/*if (!_GPUSelected)
 	{
 		if (deviceCount == 0)
 		{
@@ -250,7 +260,7 @@ void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY)
 	{
 		cudaSetDevice(0);
 		std::cout << "Using Device 0" << std::endl;
-	}
+	}*/
 
 	// Threading
 	uint32_t threadCount = 1024;
@@ -264,29 +274,29 @@ void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY)
 	float* lumaData;
 	cudaMalloc((void**)&lumaData, sizeof(float) * pX * pY);
 
-	std::cout << "cMalloc: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "cMalloc: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	// Run Transpose
 	kPreProcess << < blockCount, threadCount >> > (data, imageData, len);
 	cudaDeviceSynchronize();
-	std::cout << "PreProcess: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "PreProcess: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	// Run Process
 	kProcessStepOne << < blockCount, threadCount >> >(imageData, chromaData, lumaData, len, pX, pY);
 	cudaDeviceSynchronize();
-	std::cout << "Process: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "Process: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	// Sync the GPU. We need step 1 to finish before step is scheduled
 	cudaDeviceSynchronize();
-	std::cout << "Synchronize: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "Synchronize: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	// Run Stitch
 	kProcessStepTwo << < blockCount, threadCount >> >(imageData, chromaData, lumaData, len, pX, pY);
-	std::cout << "Stitch " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "Stitch " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	cudaFree(chromaData);
 	cudaFree(lumaData);
-	std::cout << "Free: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "Free: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	// Run antiTranspose
 	kPostProcess << < blockCount, threadCount >> > (data, imageData, len);
@@ -294,14 +304,14 @@ void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY)
 
 	// Sync
 	cudaDeviceSynchronize();
-	std::cout << "PostProcess: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	//std::cout << "PostProcess: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
 	// free
 	cudaFree(imageData);
 }
 
 
-void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t pY)
+void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t pY, int GPU)
 {
 	// MEMCPY to GPU
 	unsigned char* deviceData;
@@ -311,7 +321,7 @@ void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t 
 	cudaMemcpy(deviceData, data, dataLength, cudaMemcpyHostToDevice);
 
 
-	gpuSelector(deviceData, dataLength, pX, pY);
+	gpuSelector(deviceData, dataLength, pX, pY, GPU);
 
 
 
@@ -321,4 +331,16 @@ void gpuProcess(unsigned char* data, uint64_t dataLength, uint32_t pX, uint32_t 
 
 	// Make sure GPU is in a good state!
 	cudaDeviceReset();
+}
+
+
+
+// GPU COUNT
+// Returns GPU Count
+
+int gpuCount()
+{
+	int deviceCount;
+	cudaGetDeviceCount(&deviceCount);
+	return deviceCount;
 }

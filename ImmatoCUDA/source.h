@@ -1,7 +1,9 @@
 #pragma once
 
 #include "..\lib\FreeImage.h"
+#include <thread>
 #include <stdio.h>
+#include <mutex>
 #include <tchar.h>
 #include <iostream>
 #include <windows.h>
