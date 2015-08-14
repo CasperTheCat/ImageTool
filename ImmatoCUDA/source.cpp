@@ -12,35 +12,49 @@ void mainLine(char* file_name_str, int GPU)
 	// TODO: DETECT MISSING FILES!
 
 	// Load Image
-	gpuThread_mtx.lock();
-	FIBITMAP* _bitMap = FreeImage_Load(FreeImage_GetFileType(file_name_str), file_name_str);
-	gpuThread_mtx.unlock();
+	//gpuThread_mtx.lock();
+	// 
+
+	// BitMap Pointers
+	// oBitMap = Original Load
+	// convBitMap = convertedBitMap
+	FIBITMAP* convBitMap;
+	FIBITMAP* oBitMap = FreeImage_Load(FreeImage_GetFileType(file_name_str), file_name_str);
+
+	// Convert and Free Old resources
+	convBitMap = FreeImage_ConvertTo32Bits(oBitMap);
+	FreeImage_Unload(oBitMap);
+
+	//gpuThread_mtx.unlock();
 	//FIBITMAP* _bitMap = FreeImage_Load(FIF_PNG, file_name_str);
 
 
-	// Handle non 32bpp files
-	if (FreeImage_GetBPP(_bitMap) != 32)
+
+	/*// Handle non 32bpp files
+	if (FreeImage_GetBPP(oBitMap) != 32)
 	{
-		_bitMap = FreeImage_ConvertTo32Bits(_bitMap);
-	}
+		convBitMap = FreeImage_ConvertTo32Bits(oBitMap);
+		FreeImage_Unload(oBitMap);
+	}*/
+
 
 	char* _outName = new char[256];
 	strcpy_s(_outName, 250, file_name_str);
 	strcat_s(_outName, 256, ".png");
 
 	//Get Current image data - make a struct for this, it is awful
-	uint32_t iWidth = FreeImage_GetWidth(_bitMap);
-	uint32_t iHeight = FreeImage_GetHeight(_bitMap);
+	uint32_t iWidth = FreeImage_GetWidth(convBitMap);
+	uint32_t iHeight = FreeImage_GetHeight(convBitMap);
 	/*_bitMap = FreeImage_Rescale(_bitMap, iWidth * 4, iHeight * 4);
 	iWidth = FreeImage_GetWidth(_bitMap);
 	iHeight = FreeImage_GetHeight(_bitMap);*/
-	unsigned pitch = FreeImage_GetPitch(_bitMap);
+	/*unsigned pitch = FreeImage_GetPitch(_bitMap);
 	unsigned BPP = FreeImage_GetBPP(_bitMap);
 	unsigned rMask = FreeImage_GetRedMask(_bitMap);
 	unsigned gMask = FreeImage_GetGreenMask(_bitMap);
-	unsigned bMask = FreeImage_GetBlueMask(_bitMap);
+	unsigned bMask = FreeImage_GetBlueMask(_bitMap);*/
 
-	unsigned char* imageData = FreeImage_GetBits(_bitMap);
+	unsigned char* imageData = FreeImage_GetBits(convBitMap);
 	gpuProcess(imageData, iWidth * iHeight * 4, iWidth, iHeight,GPU);
 
 
@@ -51,16 +65,31 @@ void mainLine(char* file_name_str, int GPU)
 	//FIBITMAP* finalOutput = FreeImage_Rescale(preProc_bitmap, iWidth / 2, iHeight / 2);
 
 	//finalOutput = Immato_RunCustom(finalOutput, iWidth / 2, iHeight / 2, pitch, BPP, rMask, gMask, bMask);
-	gpuThread_mtx.lock();
-	FreeImage_Save(FIF_PNG, _bitMap, _outName);
-	gpuThread_mtx.unlock();
+	//gpuThread_mtx.lock();
+	FreeImage_Save(FIF_PNG, convBitMap, _outName);
+	//gpuThread_mtx.unlock();
 	//FreeImage_CloseMemory();
+	FreeImage_Unload(convBitMap);
+	//free(_bitMap);
+	//free(imageData);
 
 	free(_outName);
 
 	//delete[] file_name_str;
 }
 
+// Load Bar
+// Loading Bar Progress
+// 
+static inline void loadBar(int cLoop, int endLoop)
+{
+
+	// Calculate the ratio of complete-to-incomplete.
+	float ratio = cLoop / (float)endLoop;
+
+	// Print
+	cout << cLoop << "/" << endLoop << "\t : " << std::setprecision(3) << ratio * 100 << "%\t\t\t\r";
+}
 
 
 // Entry Point
@@ -127,10 +156,11 @@ int main(int argc, char** argv)
 				{
 					tPool[cT]->join();
 					--jobsRemaining;
+					//cout << "File " << jobsAllocated - devCount + 1<< " completed" << endl;
+					loadBar(jobsAllocated - devCount + 1, argc - 1);
 					if (jobsAllocated < argc - 1)
 					{
-						jobsAllocated++; // SEMAPHORE?
-						cout << jobsRemaining << endl;
+						jobsAllocated++;
 						tPool[cT] = new thread(mainLine, argv[jobsAllocated], cT);
 					}
 				}

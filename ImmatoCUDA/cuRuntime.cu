@@ -12,6 +12,27 @@
 #include "cuda_d3d11_interop.h"*/
 /*#include "math_functions.h"*/
 
+
+// OPTIONS
+// These are options, they will be made later
+
+// Darkness
+#define darkPivot 0.0f // DEF 0.1f
+
+// uSharp
+#define uSharpStrength 1.f
+#define uSharpWidth 1.f
+
+// Contrast
+#define contraStrength 1.1f
+#define contraPivot 0.5f
+
+// Experimental
+#define r_experimental 0
+
+
+// END OPTIONS
+
 #define LUMA float3{float(0.2126), float(0.7152), float(0.0722)}
 
 // Define LUMA
@@ -34,13 +55,17 @@ __device__ inline float dot(float4 iX, float3 iY)
 }
 
 
-
-// REM cudaFree
 #pragma region Define Operators
 __device__
 float3 operator- (float3 f1, float f2)
 {
 	return float3{ f1.x - f2, f1.y - f2, f1.z - f2 };
+}
+
+__device__
+float3 operator- (float3 f1, float3 f2)
+{
+	return float3{ f1.x - f2.x, f1.y - f2.y, f1.z - f2.z };
 }
 
 __device__
@@ -50,9 +75,21 @@ float3 operator+ (float3 f1, float f2)
 }
 
 __device__
+float3 operator+ (float3 f1, float3 f2)
+{
+	return float3{ f1.x + f2.x, f1.y + f2.y, f1.z + f2.z };
+}
+
+__device__
 float3 operator/ (float3 f1, float f2)
 {
 	return float3{ f1.x / f2, f1.y / f2, f1.z / f2 };
+}
+
+__device__
+float3 operator/ (float f1, float3 f2)
+{
+	return float3{ f1 / f2.x, f1 / f2.y, f1 / f2.z };
 }
 
 __device__
@@ -61,8 +98,16 @@ float3 operator* (float3 f1, float f2)
 	return float3{ f1.x * f2, f1.y * f2, f1.z * f2 };
 }
 
+__device__
+float3 operator* (float3 f1, float3 f2)
+{
+	return float3{ f1.x * f2.x, f1.y * f2.y, f1.z * f2.z };
+}
+
 
 #pragma endregion
+
+#pragma region Helpers
 __host__ __device__
 int Modulus(int a, int b)
 {
@@ -77,6 +122,11 @@ __host__ __device__
 inline T lerp(T v0, T v1, T t)
 {
 	return fma(t, v1, fma(-t, v0, v0));
+}
+
+__device__ inline float3 lerp(float3 fX, float3 fY, float fZ)
+{
+	return fX*(1 - fZ) + fY*fZ;
 }
 
 __device__ inline float gpuClamp(float in_t, int high_i, int low_i)
@@ -99,6 +149,8 @@ __device__ inline unsigned char FTC(float in)
 	return unsigned char(gpuClamp(in) * 255);
 }
 
+#pragma endregion
+
 // PreProcessor, does a transpose op
 __global__ void kPreProcess(unsigned char* data, float3* out, uint64_t len)
 {
@@ -112,6 +164,9 @@ __global__ void kPreProcess(unsigned char* data, float3* out, uint64_t len)
 
 }
 
+
+
+
 // PostProcessor, does a reverse transpose op
 __global__ void kPostProcess(unsigned char* data, float3* in, uint64_t len)
 {
@@ -123,9 +178,23 @@ __global__ void kPostProcess(unsigned char* data, float3* in, uint64_t len)
 	data[dataLocation + 1] = FTC(in[gIdx].y);
 	data[dataLocation + 2] = FTC(in[gIdx].z);
 	//data[dataLocation + 3] = FTC(1.f);
-	// ignore alpha. We left it in the array
+	// Skip alpha. We left it in the array
 }
 
+
+// Bloom Effect
+// Experimental Bloom
+//
+__device__ float3 r_bloom(float3* aColor, uint64_t idx)
+{
+	// Not Yet Implemented
+	return aColor[idx] * aColor[idx];
+}
+
+
+// Device lumaSharpen
+// Sharpen the image with a uSharp Mask
+//
 __device__ float lumaSharp(float3* in, uint64_t len, uint64_t idx, uint32_t pX, uint32_t pY, int fW)
 {
 	float difUp = dot(in[Modulus(idx - pX * fW, pX * pY)], LUMA);
@@ -150,23 +219,14 @@ __device__ float lumaSharp(float3* in, uint64_t len, uint64_t idx, uint32_t pX, 
 		+ difUpLeft * 0.11f
 		+ difDownLeft * 0.11f
 		+ difDownRight * 0.11f);
-
-	/*return (difUp * 0.125f
-	+ difDown * 0.125f
-	+ difLeft *  0.125f
-	+ difRight *  0.125f
-	+ difUpRight *  0.125f
-	+ difUpLeft *  0.125f
-	+ difDownLeft *  0.125f
-	+ difDownRight *  0.125f);*/
 }
+
 
 
 // Main Processor step
 __global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t len, uint32_t pX, uint32_t pY)
 {
 	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
-	uint64_t dataLocation = gIdx * 4;
 	if (gIdx >= pY*pX) { return; }
 
 	//float3 temp = in[gIdx];
@@ -175,43 +235,55 @@ __global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t 
 	float3 pChro = in[gIdx] - pLuma;
 
 
+	// pDarkness. Pivot / Color. 
+	// Add in Central Shift
+	// Mid Shift = 2Pivot, from Pivot / 0.5f 
+	if (darkPivot > 0.f)
+	{
+		float pDark = (darkPivot / pLuma) - (darkPivot * 2);
+		pLuma -= pDark;
+	}
 
-	// Sharpen - Get Blur
-	float blur = lumaSharp(in, len, gIdx, pX, pY,1);
+	// Sharpen
+	// This effect is similar to the Adobe UnSharp Mask
+	float sharpMask = 0.f; // Default to Zero
+	if (uSharpWidth > 0.f && uSharpStrength > 0.f)
+	{
+		// Sharpen - Get Blur
+		float blur = lumaSharp(in, len, gIdx, pX, pY, uSharpWidth);
+		// Sharpen - Sub Blur from Luma
+		sharpMask = dot(pLuma - blur, LUMA * uSharpStrength);
+	}
 
-
-	// Sharpen - Sub Blur from Luma
-	float sharp = pLuma - blur;
+	// Contrast
+	if (contraStrength > 0.f)
+		pChro = ((pChro - contraPivot) * contraStrength) + contraPivot;
 
 
 
 
 	// Bloom?
+#if r_experimental == 1
+	pChro = r_bloom(in,gIdx);
+#endif
 
-	// Edge Detect
 
 
-	// Contrast
-	pChro = ((pChro - 0.5f) * 1.1f) + 0.5f;
+
 
 	// % Brightness
-	float vLen = dot(1.0, pChro) / 3;
-	pChro = pChro * (1.25f + vLen);
+	/*float vLen = dot(1.0, pChro) / 3;
+	pChro = pChro * (1.25f + vLen);*/
 	//pChro = pChro * 1.5f;
 
 	cOut[gIdx] = pChro;
-	lOut[gIdx] = pLuma + dot(sharp, LUMA * 2);
-
-	/*__syncthreads();
-	in[gIdx] = pChro + pLuma + dot(sharp, LUMA * 2);*/
-	//in[gIdx] = { blur,blur,blur };
+	lOut[gIdx] = pLuma + sharpMask;
 }
 
 // Stitch Buffers
 __global__ void kProcessStepTwo(float3* out, float3* cIn, float* lIn, uint64_t len, uint32_t pX, uint32_t pY)
 {
 	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
-	uint64_t dataLocation = gIdx * 4;
 	if (gIdx >= pY*pX) { return; }
 
 	// Stitch data

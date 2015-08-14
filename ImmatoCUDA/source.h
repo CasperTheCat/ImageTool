@@ -2,6 +2,7 @@
 
 #include "..\lib\FreeImage.h"
 #include <thread>
+#include <iomanip>
 #include <stdio.h>
 #include <mutex>
 #include <tchar.h>
