@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{467737C9-2CB8-4F27-9309-F1967D88F2B9}</ProjectGuid>
+    <ProjectGuid>{4E481AB7-88F9-4D62-8466-2CEC52FC8397}</ProjectGuid>
     <RootNamespace>ImmatoCUDA</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -52,6 +52,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.5.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\IntelOpenCL.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -138,7 +139,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <TreatWarningAsError>true</TreatWarningAsError>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <MinimalRebuild>true</MinimalRebuild>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -167,17 +168,19 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="cuRuntime.cu" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="cuRuntime.cuh" />
+    <ClInclude Include="clDecl.h" />
+    <ClInclude Include="clDefinitions.h" />
+    <ClInclude Include="clRuntime.h" />
     <ClInclude Include="source.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="clDecl.cpp" />
+    <ClCompile Include="clDefinitions.cpp" />
     <ClCompile Include="source.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.5.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\IntelOpenCL.targets" />
   </ImportGroup>
 </Project>

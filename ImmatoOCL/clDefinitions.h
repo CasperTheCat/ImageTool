@@ -1,3 +1,4 @@
+#pragma once
 #include "cl/cl.h"
 #include <vector>
 #include <memory.h>

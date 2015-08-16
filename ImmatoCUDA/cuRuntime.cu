@@ -4,13 +4,6 @@
 #include "cuRuntime.cuh"
 #include <iostream>
 #include <stdio.h>
-/*#include "helper_math.h"
-#include "helper_image.h"*/
-/*#include "cuda_fp16.h"
-#include "cudaGL.h"
-#include "cudaD3D11.h"
-#include "cuda_d3d11_interop.h"*/
-/*#include "math_functions.h"*/
 
 
 // OPTIONS
@@ -57,6 +50,58 @@ __device__ inline float dot(float4 iX, float3 iY)
 	return (iX.x * iY.x) + (iX.y * iY.y) + (iX.z * iY.z);
 }
 
+
+#pragma region Define Operators F4
+__device__
+float4 operator- (float4 f1, float f2)
+{
+	return float4{ f1.x - f2, f1.y - f2, f1.z - f2, f1.w };
+}
+
+__device__
+float4 operator- (float4 f1, float4 f2)
+{
+	return float4{ f1.x - f2.x, f1.y - f2.y, f1.z - f2.z, f1.w };
+}
+
+__device__
+float4 operator+ (float4 f1, float f2)
+{
+	return float4{ f1.x + f2, f1.y + f2, f1.z + f2, f1.w };
+}
+
+__device__
+float4 operator+ (float4 f1, float4 f2)
+{
+	return float4{ f1.x + f2.x, f1.y + f2.y, f1.z + f2.z, f1.w };
+}
+
+__device__
+float4 operator/ (float4 f1, float f2)
+{
+	return float4{ f1.x / f2, f1.y / f2, f1.z / f2, f1.w };
+}
+
+__device__
+float4 operator/ (float f1, float4 f2)
+{
+	return float4{ f1 / f2.x, f1 / f2.y, f1 / f2.z, f2.w };
+}
+
+__device__
+float4 operator* (float4 f1, float f2)
+{
+	return float4{ f1.x * f2, f1.y * f2, f1.z * f2, f1.w };
+}
+
+__device__
+float4 operator* (float4 f1, float4 f2)
+{
+	return float4{ f1.x * f2.x, f1.y * f2.y, f1.z * f2.z, f1.w };
+}
+
+
+#pragma endregion
 
 #pragma region Define Operators
 __device__
@@ -131,6 +176,10 @@ __device__ inline float3 lerp(float3 fX, float3 fY, float fZ)
 {
 	return fX*(1 - fZ) + fY*fZ;
 }
+__device__ inline float4 lerp(float4 fX, float4 fY, float fZ)
+{
+	return fX*(1 - fZ) + fY*fZ;
+}
 
 __device__ inline float gpuClamp(float in_t, int high_i, int low_i)
 {
@@ -154,24 +203,25 @@ __device__ inline unsigned char FTC(float in)
 
 #pragma endregion
 
+
 // PreProcessor, does a transpose op
-__global__ void kPreProcess(unsigned char* data, float3* out, uint64_t len)
+__global__ void kPreProcess(unsigned char* data, float4* out, uint64_t len)
 {
 	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
 	uint64_t dataLocation = gIdx * 4;
 	if (dataLocation >= len) return;
 
-	out[gIdx].x = CTF(data[dataLocation]);
-	out[gIdx].y = CTF(data[dataLocation + 1]);
-	out[gIdx].z = CTF(data[dataLocation + 2]);
-
+	out[gIdx].x = CTF(data[dataLocation]);      // R
+	out[gIdx].y = CTF(data[dataLocation + 1]);  // G
+	out[gIdx].z = CTF(data[dataLocation + 2]);  // B
+	out[gIdx].w = CTF(data[dataLocation + 3]);  // A
 }
 
 
 
 
 // PostProcessor, does a reverse transpose op
-__global__ void kPostProcess(unsigned char* data, float3* in, uint64_t len)
+__global__ void kPostProcess(unsigned char* data, float4* in, uint64_t len)
 {
 	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
 	uint64_t dataLocation = gIdx * 4;
@@ -180,15 +230,14 @@ __global__ void kPostProcess(unsigned char* data, float3* in, uint64_t len)
 	data[dataLocation] = FTC(in[gIdx].x);
 	data[dataLocation + 1] = FTC(in[gIdx].y);
 	data[dataLocation + 2] = FTC(in[gIdx].z);
-	//data[dataLocation + 3] = FTC(1.f);
-	// Skip alpha. We left it in the array
+	data[dataLocation + 3] = FTC(in[gIdx].w);
 }
 
 
 // Bloom Effect
 // Experimental Bloom
 //
-__device__ float3 r_bloom(float3* aColor, uint64_t idx)
+__device__ float4 r_bloom(float4* aColor, uint64_t idx)
 {
 	// Not Yet Implemented
 	return aColor[idx] * aColor[idx];
@@ -198,7 +247,7 @@ __device__ float3 r_bloom(float3* aColor, uint64_t idx)
 // Device lumaSharpen
 // Sharpen the image with a uSharp Mask
 //
-__device__ float lumaSharp(float3* in, uint64_t len, uint64_t idx, uint32_t pX, uint32_t pY, int fW)
+__device__ float lumaSharp(float4* in, uint64_t idx, uint32_t pX, uint32_t pY, int fW)
 {
 	float difUp = dot(in[Modulus(idx - pX * fW, pX * pY)], LUMA);
 	float difDown = dot(in[Modulus(idx + pX * fW, pX * pY)], LUMA);
@@ -227,15 +276,14 @@ __device__ float lumaSharp(float3* in, uint64_t len, uint64_t idx, uint32_t pX, 
 
 
 // Main Processor step
-__global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t len, uint32_t pX, uint32_t pY)
+__global__ void kProcess(float4* cIn, float4* cOut, uint32_t pX, uint32_t pY)
 {
 	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (gIdx >= pY*pX) { return; }
 
-	//float3 temp = in[gIdx];
 	// Strip Luma!
-	float pLuma = dot(in[gIdx], LUMA);
-	float3 pChro = in[gIdx] - pLuma;
+	float pLuma = dot(cIn[gIdx], LUMA);
+	float4 pChro = cIn[gIdx] - pLuma;
 
 
 	// pDarkness. Pivot / Color. 
@@ -253,17 +301,10 @@ __global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t 
 	if (uSharpWidth > 0.f && uSharpStrength > 0.f)
 	{
 		// Sharpen - Get Blur
-		float blur = lumaSharp(in, len, gIdx, pX, pY, uSharpWidth);
+		float blur = lumaSharp(cIn, gIdx, pX, pY, uSharpWidth);
 		// Sharpen - Sub Blur from Luma
 		sharpMask = dot(pLuma - blur, LUMA * uSharpStrength);
 	}
-
-	/*// Contrast
-	if (contraStrength > 0.f)
-		pChro = ((pChro - contraPivot) * contraStrength) + contraPivot;*/
-
-
-
 
 	// Bloom?
 #if r_experimental
@@ -277,121 +318,53 @@ __global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t 
 	// or
 	//pChro = pChro * ( 1.f + (dot(1.0, pChro) / 3));
 
+	// Saturate and restitch
+	float4 cStitch = pChro + (pLuma + sharpMask);
+	float4 sColor = lerp(float4{ (pLuma + sharpMask), (pLuma + sharpMask), (pLuma + sharpMask), pChro.w }, cStitch, satStrength);
 
-	cOut[gIdx] = pChro;
-	lOut[gIdx] = pLuma + sharpMask;
+	// Contrast and save to array
+	cOut[gIdx] = ((sColor - contraPivot) * contraStrength) + contraPivot;
+	//cOut[gIdx] = pChro +pLuma + sharpMask;
 }
 
-// Stitch Buffers
-__global__ void kProcessStepTwo(float3* out, float3* cIn, float* lIn, uint64_t len, uint32_t pX, uint32_t pY)
-{
-	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (gIdx >= pY*pX) { return; }
-
-	float3 pChro = cIn[gIdx];
-	float pLuma = lIn[gIdx];
-	float3 fColor;
-	// Stitch data
-	//out[gIdx] = cIn[gIdx] + lIn[gIdx];
-
-	// Saturate and Stitch
-	fColor = lerp(float3{ pLuma, pLuma, pLuma}, pChro + pLuma, satStrength);
-
-
-	// Contrast
-	out[gIdx] = ((fColor - contraPivot) * contraStrength) + contraPivot;
-
-}
-
-
-bool _GPUSelected =false;
 void gpuSelector(unsigned char* data, uint64_t len, uint32_t pX, uint32_t pY, int fGPU)
 {
-	// Get Device. ATM this check if to prevent Driver RST
-	//int deviceCount;
-	//cudaGetDeviceCount(&deviceCount);
-	/*if (fGPU <= deviceCount)
-	{
-		cudaSetDevice(fGPU);
-		std::cout << "Thread is utilizing GPU " << fGPU << std::endl;
-	}
-	else
-	{
-		std::cout << "Threading Failure!!!" << std::endl;
-		return; 
-	}*/
-        cudaSetDevice(fGPU);
-	/*if (!_GPUSelected)
-	{
-		if (deviceCount == 0)
-		{
-			std::cout << "CUDA Capable GPU was not detected" << std::endl;
-			return;
-		}
-		else
-		{
-			std::cout << deviceCount << " CUDA capable GPUs were detected" << std::endl;
-			_GPUSelected = true;
-		}
-	}
-
-	if (deviceCount > 1) 
-	{
-		cudaSetDevice(0);
-		std::cout << "Using Device 1" << std::endl;
-	}
-	else
-	{
-		cudaSetDevice(0);
-		std::cout << "Using Device 0" << std::endl;
-	}*/
-
-	// Threading
+	// Useless call. Extremely low overhead so I'm remove and validate later
+    cudaSetDevice(fGPU);
+	
+	// Threading values
 	uint32_t threadCount = 1024;
 	uint32_t blockCount = (pY * pX) / threadCount + 1;
 
-	// Setup the transpose!
-	float3* imageData;
-	cudaMalloc((void**)&imageData, sizeof(float3) * pX * pY);
-	float3* chromaData;
-	cudaMalloc((void**)&chromaData, sizeof(float3) * pX * pY);
-	float* lumaData;
-	cudaMalloc((void**)&lumaData, sizeof(float) * pX * pY);
+	// Image data is Data from the CPU
+	float4* inImageData;
+	cudaMalloc((void**)&inImageData, sizeof(float4) * pX * pY);
 
-	//std::cout << "cMalloc: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	// Where finished data will go
+	float4* outImageData;
+	cudaMalloc((void**)&outImageData, sizeof(float4) * pX * pY);
 
-	// Run Transpose
-	kPreProcess << < blockCount, threadCount >> > (data, imageData, len);
+	// Run Transpose - faster on GPU until I write the Intel SIMD stuff
+	kPreProcess <<< blockCount, threadCount >>> (data, inImageData, len);
+	
+	// Sync the GPU. This is barrier
 	cudaDeviceSynchronize();
-	//std::cout << "PreProcess: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
-
-	// Run Process
-	kProcessStepOne << < blockCount, threadCount >> >(imageData, chromaData, lumaData, len, pX, pY);
+	
+	// Run Main
+	kProcess <<< blockCount, threadCount >>>(inImageData, outImageData, pX, pY);
+	
+	// Sync the GPU. Another Barrier
 	cudaDeviceSynchronize();
-	//std::cout << "Process: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
 
-	// Sync the GPU. We need step 1 to finish before step is scheduled
+	// We are done with the initial data from the CPU
+	cudaFree(inImageData);
+
+	// Revert the formatting of the data
+	kPostProcess <<< blockCount, threadCount >>> (data, outImageData, len);
+
+	// Sync before final free
 	cudaDeviceSynchronize();
-	//std::cout << "Synchronize: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
-
-	// Run Stitch
-	kProcessStepTwo << < blockCount, threadCount >> >(imageData, chromaData, lumaData, len, pX, pY);
-	//std::cout << "Stitch " << cudaGetErrorString(cudaGetLastError()) << std::endl;
-
-	cudaFree(chromaData);
-	cudaFree(lumaData);
-	//std::cout << "Free: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
-
-	// Run antiTranspose
-	kPostProcess << < blockCount, threadCount >> > (data, imageData, len);
-
-
-	// Sync
-	cudaDeviceSynchronize();
-	//std::cout << "PostProcess: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
-
-	// free
-	cudaFree(imageData);
+	cudaFree(outImageData);
 }
 
 

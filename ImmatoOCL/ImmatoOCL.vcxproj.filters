@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="source.cpp" />
+    <ClCompile Include="clDefinitions.cpp" />
+    <ClCompile Include="clDecl.cpp">
+      <Filter>OpenCL</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source.h" />
+    <ClInclude Include="clRuntime.h" />
+    <ClInclude Include="clDefinitions.h" />
+    <ClInclude Include="clDecl.h">
+      <Filter>OpenCL</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="OpenCL Files">
+      <UniqueIdentifier>{D011BB44-1BF7-4113-997B-A081035B40D8}</UniqueIdentifier>
+      <Extensions>cl</Extensions>
+    </Filter>
+    <Filter Include="OpenCL">
+      <UniqueIdentifier>{a3bb78cb-623c-40e1-a113-6a6cde2a9d33}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
