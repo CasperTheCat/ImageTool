@@ -40,7 +40,7 @@ void mainLine(char* file_name_str, int GPU)
 
 	char* _outName = new char[256];
 	strcpy_s(_outName, 250, file_name_str);
-	strcat_s(_outName, 256, ".png");
+	strcat_s(_outName, 256, "_p.png");
 
 	//Get Current image data - make a struct for this, it is awful
 	uint32_t iWidth = FreeImage_GetWidth(convBitMap);
@@ -142,6 +142,7 @@ int main(int argc, char** argv)
 			jobsAllocated++;
 			cout << "Thread " << tJ << " using GPU " << tJ << endl;
 		}
+		cout << endl;
 
 		// Loop until all done. We are off by one...
 		// I don't even

@@ -17,15 +17,18 @@
 // These are options, they will be made later
 
 // Darkness
-#define darkPivot 0.0f // DEF 0.1f
+#define darkPivot -0.1f // DEF 0.1f
 
 // uSharp
 #define uSharpStrength 1.f
-#define uSharpWidth 1.f
+#define uSharpWidth 1
 
 // Contrast
 #define contraStrength 1.1f
 #define contraPivot 0.5f
+
+// Saturation
+#define satStrength 1.5f
 
 // Experimental
 #define r_experimental 0
@@ -255,26 +258,25 @@ __global__ void kProcessStepOne(float3* in, float3* cOut, float* lOut, uint64_t 
 		sharpMask = dot(pLuma - blur, LUMA * uSharpStrength);
 	}
 
-	// Contrast
+	/*// Contrast
 	if (contraStrength > 0.f)
-		pChro = ((pChro - contraPivot) * contraStrength) + contraPivot;
+		pChro = ((pChro - contraPivot) * contraStrength) + contraPivot;*/
 
 
 
 
 	// Bloom?
-#if r_experimental == 1
+#if r_experimental
 	pChro = r_bloom(in,gIdx);
 #endif
 
 
+	// Aberration
+	//float vLen = dot(1.0, pChro) / 3;
+	//pChro = pChro * (1.25f + vLen);
+	// or
+	//pChro = pChro * ( 1.f + (dot(1.0, pChro) / 3));
 
-
-
-	// % Brightness
-	/*float vLen = dot(1.0, pChro) / 3;
-	pChro = pChro * (1.25f + vLen);*/
-	//pChro = pChro * 1.5f;
 
 	cOut[gIdx] = pChro;
 	lOut[gIdx] = pLuma + sharpMask;
@@ -286,10 +288,19 @@ __global__ void kProcessStepTwo(float3* out, float3* cIn, float* lIn, uint64_t l
 	uint64_t gIdx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (gIdx >= pY*pX) { return; }
 
+	float3 pChro = cIn[gIdx];
+	float pLuma = lIn[gIdx];
+	float3 fColor;
 	// Stitch data
-	out[gIdx] = cIn[gIdx] + lIn[gIdx];
-	//in[gIdx] =  + pLuma + dot(sharp, LUMA * 2);
-	//in[gIdx] = { blur,blur,blur };
+	//out[gIdx] = cIn[gIdx] + lIn[gIdx];
+
+	// Saturate and Stitch
+	fColor = lerp(float3{ pLuma, pLuma, pLuma}, pChro + pLuma, satStrength);
+
+
+	// Contrast
+	out[gIdx] = ((fColor - contraPivot) * contraStrength) + contraPivot;
+
 }
 
 
